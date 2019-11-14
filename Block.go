@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/gob"
 	"log"
 	"time"
 )
@@ -34,6 +35,34 @@ func NewBlock(Data string, PrvHash []byte) *Block {
 	block.Nonce = nonce
 	block.Hash = hash
 	return &block
+}
+
+func NewGenesisBlock() *Block {
+	return NewBlock("这是创世块", []byte{})
+}
+
+//区块的序列化
+func (b *Block) Serialize() []byte {
+	var buffer bytes.Buffer
+	encoder := gob.NewEncoder(&buffer)
+	err := encoder.Encode(&b)
+	if err != nil {
+		log.Panic("encode err")
+		return []byte{}
+	}
+	return buffer.Bytes()
+}
+
+//区块的反序列化
+func DeSerialize(buffer []byte) Block {
+	var block Block
+	decoder := gob.NewDecoder(bytes.NewReader(buffer))
+	err := decoder.Decode(&block)
+	if err != nil {
+
+		return block
+	}
+	return block
 }
 
 //TODO

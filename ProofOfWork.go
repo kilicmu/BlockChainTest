@@ -24,7 +24,7 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 func (pow *ProofOfWork) Run() (uint64, []byte) {
 	b := pow.b
 	nonce := uint64(00)
-	for{
+	for {
 		tmp := [][]byte{
 			Uint64ToByte(b.Version),
 			Uint64ToByte(b.Difficulty),
@@ -40,15 +40,13 @@ func (pow *ProofOfWork) Run() (uint64, []byte) {
 		tmpBigInt := big.Int{}
 		tmpBigInt.SetBytes(hash[:])
 
-		if tmpBigInt.Cmp(pow.target) == -1{
+		if tmpBigInt.Cmp(pow.target) == -1 {
 			fmt.Printf("get hash: %x nonce: %d\n", hash, nonce)
 			return nonce, hash[:]
-		} else{
-
+		} else {
 			nonce++
 			//fmt.Print(nonce)
 		}
 	}
-
 
 }
