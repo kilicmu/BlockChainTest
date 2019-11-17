@@ -32,7 +32,6 @@ func (pow *ProofOfWork) Run() (uint64, []byte) {
 			Uint64ToByte(nonce),
 			b.MerkelRoot,
 			b.Hash,
-			b.Data,
 			b.PrvHash,
 		}
 		BlockInfo := bytes.Join(tmp, []byte{})
