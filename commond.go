@@ -27,11 +27,11 @@ func (cil *CIL) ShowChain() {
 		fmt.Printf("工作量证明: %d\n", block.Nonce)
 	}
 }
-
+//添加区块接口
 func (cil *CIL) AddBlock(txs []*Transaction) {
 	cil.bc.AddBlock(txs)
 }
-
+//用于查询地址的余额接口
 func (cil *CIL) GetBlance(address string) {
 	utxos := cil.bc.FindUTXOs(address)
 	var value float64
@@ -40,7 +40,7 @@ func (cil *CIL) GetBlance(address string) {
 	}
 	fmt.Printf("address: %v has %v btc", address, value)
 }
-
+//用于调用转账功能的接口
 func (cil *CIL) Send(from, to string, amount float64, miner, data string) {
 	tx := NewTransaction(from, to, amount, cil.bc)
 	if tx == nil {

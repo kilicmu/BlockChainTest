@@ -86,8 +86,43 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 
 func (bc *BlockChain) FindUTXOs(address string) []TXOutput {
 	var UTXOs []TXOutput
-	spentOutputs := make(map[string][]int64)
+	txs := bc.FindALLTxs(address)
+	for _, tx := range txs {
+		for _, output := range tx.TXOutputs {
+			if output.PubKeyHash == address {
+				UTXOs = append(UTXOs, output)
+			}
+		}
+	}
+	return UTXOs
+}
+
+//传入支付地址与需要支付的价格, 返回一个需要使用的output的map[交易id]交易output标志,与实际找到的金额
+func (bc *BlockChain) FindNeedUTXOs(address string, need float64) (map[string][]int64, float64) {
+	UTXOs := make(map[string][]int64)
+	var amount float64 = 0.00
+	txs := bc.FindALLTxs(address)
+	for _, tx := range txs {
+		for i, output := range tx.TXOutputs {
+			if output.PubKeyHash == address {
+				if amount < need {
+					UTXOs[string(tx.TXID)] = append(UTXOs[string(tx.TXID)], int64(i))
+					amount += output.Value
+					if amount > need {
+						return UTXOs, amount
+					}
+				}
+
+			}
+		}
+	}
+	return UTXOs, -1
+}
+
+func (bc *BlockChain) FindALLTxs(address string) []*Transaction {
+	var UTXOs []*Transaction
 	it := bc.NewBlockChainIterator()
+	spentOutputs := make(map[string][]int64)
 	for {
 		block := it.Next()
 		//此处开始遍历交易
@@ -105,7 +140,7 @@ func (bc *BlockChain) FindUTXOs(address string) []TXOutput {
 					}
 				}
 				if output.PubKeyHash == address {
-					UTXOs = append(UTXOs, output)
+					UTXOs = append(UTXOs, tx)
 				}
 			}
 			//遍历input, 找到花费的utxo合集
@@ -125,60 +160,4 @@ func (bc *BlockChain) FindUTXOs(address string) []TXOutput {
 	}
 
 	return UTXOs
-}
-
-//传入支付地址与需要支付的价格, 返回一个需要使用的output的map[交易id]交易output标志,与实际找到的金额
-func (bc *BlockChain) FindNeedUTXOs(address string, need float64) (map[string][]int64, float64) {
-	UTXOs := make(map[string][]int64)
-	var amount float64 = 0.00
-	spentOutputs := make(map[string][]int64)
-	it := bc.NewBlockChainIterator()
-	for {
-		block := it.Next()
-		//此处开始遍历交易
-		for _, tx := range block.Transactions {
-			//遍历output, 找到与自己相关的utxo
-		OutTag:
-			for i, output := range tx.TXOutputs {
-
-				if spentOutputs[string(tx.TXID)] != nil {
-					for _, j := range spentOutputs[string(tx.TXID)] {
-						if int64(i) == j {
-							//说明这个utox已经被消耗过了
-							continue OutTag
-						}
-					}
-				}
-				if output.PubKeyHash == address {
-					//此处复用上面代码
-					if amount < need {
-						UTXOs[string(tx.TXID)] = append(UTXOs[string(tx.TXID)], int64(i))
-						amount += output.Value
-						fmt.Println("need: ", need)
-						if amount >= need {
-							fmt.Println("满足条件")
-							return UTXOs, amount
-						}
-
-					} else {
-						fmt.Println("不满足条件")
-					}
-				}
-			}
-			//遍历input, 找到花费的utxo合集
-			if !tx.IsCoinbase() {
-				for _, input := range tx.TXInputs {
-					if input.Sig == address {
-						spentOutputs[string(input.TXid)] = append(spentOutputs[string(input.TXid)], input.Index)
-					}
-				}
-			}
-
-		}
-
-		if len(block.PrvHash) == 0 {
-			break
-		}
-	}
-	return UTXOs, -1
 }
