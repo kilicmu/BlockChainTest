@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/gob"
 	"log"
@@ -25,9 +26,9 @@ type Block struct {
 func NewBlock(txs []*Transaction, PrvHash []byte) *Block {
 	block := Block{
 		Version:      00,
-		MerkelRoot:   []byte{},
-		TimeStamp:    uint64(time.Now().Unix()),
-		Difficulty:   0,
+		MerkelRoot:   []byte{},                  //Merkel根: 用来代表区块体的HASH值(将交易组成二叉树, 两两hash得出最终结果)
+		TimeStamp:    uint64(time.Now().Unix()), //时间戳定义
+		Difficulty:   0,                         //难度值
 		Nonce:        0,
 		PrvHash:      PrvHash,
 		Hash:         []byte{},
@@ -81,6 +82,11 @@ func Uint64ToByte(num uint64) []byte {
 }
 
 func (b *Block) MakeMelRoot() {
-	//TODO
-	b.MerkelRoot = []byte{}
+	//TODO 添加梅克尔根
+	var tmp []byte
+	for _, tx := range b.Transactions {
+		tmp = append(tmp, tx.TXID...)
+	}
+	hash := sha256.Sum256(tmp)
+	b.MerkelRoot = hash[:]
 }

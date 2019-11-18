@@ -83,7 +83,7 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 		return nil
 	})
 }
-
+//找到所有当前地址的UTXO
 func (bc *BlockChain) FindUTXOs(address string) []TXOutput {
 	var UTXOs []TXOutput
 	txs := bc.FindALLTxs(address)
@@ -119,8 +119,9 @@ func (bc *BlockChain) FindNeedUTXOs(address string, need float64) (map[string][]
 	return UTXOs, -1
 }
 
+//返回包含一个地址交易的所有交易
 func (bc *BlockChain) FindALLTxs(address string) []*Transaction {
-	var UTXOs []*Transaction
+	var txs []*Transaction
 	it := bc.NewBlockChainIterator()
 	spentOutputs := make(map[string][]int64)
 	for {
@@ -140,7 +141,7 @@ func (bc *BlockChain) FindALLTxs(address string) []*Transaction {
 					}
 				}
 				if output.PubKeyHash == address {
-					UTXOs = append(UTXOs, tx)
+					txs = append(txs, tx)
 				}
 			}
 			//遍历input, 找到花费的utxo合集
@@ -159,5 +160,5 @@ func (bc *BlockChain) FindALLTxs(address string) []*Transaction {
 		}
 	}
 
-	return UTXOs
+	return txs
 }
