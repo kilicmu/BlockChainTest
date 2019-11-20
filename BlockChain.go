@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 
@@ -83,13 +84,14 @@ func (bc *BlockChain) AddBlock(txs []*Transaction) {
 		return nil
 	})
 }
+
 //找到所有当前地址的UTXO
-func (bc *BlockChain) FindUTXOs(address string) []TXOutput {
+func (bc *BlockChain) FindUTXOs(pubKeyHash []byte) []TXOutput {
 	var UTXOs []TXOutput
-	txs := bc.FindALLTxs(address)
+	txs := bc.FindAllTxs(pubKeyHash)
 	for _, tx := range txs {
 		for _, output := range tx.TXOutputs {
-			if output.PubKeyHash == address {
+			if bytes.Equal(output.PubKeyHash, pubKeyHash) {
 				UTXOs = append(UTXOs, output)
 			}
 		}
@@ -98,13 +100,14 @@ func (bc *BlockChain) FindUTXOs(address string) []TXOutput {
 }
 
 //传入支付地址与需要支付的价格, 返回一个需要使用的output的map[交易id]交易output标志,与实际找到的金额
-func (bc *BlockChain) FindNeedUTXOs(address string, need float64) (map[string][]int64, float64) {
+func (bc *BlockChain) FindNeedUTXOs(senderPubKeyHash []byte, need float64) (map[string][]int64, float64) {
 	UTXOs := make(map[string][]int64)
 	var amount float64 = 0.00
-	txs := bc.FindALLTxs(address)
+	txs := bc.FindAllTxs(senderPubKeyHash)
 	for _, tx := range txs {
 		for i, output := range tx.TXOutputs {
-			if output.PubKeyHash == address {
+			//两个byte数组比较方式bytes.Equal
+			if bytes.Equal(output.PubKeyHash, senderPubKeyHash) {
 				if amount < need {
 					UTXOs[string(tx.TXID)] = append(UTXOs[string(tx.TXID)], int64(i))
 					amount += output.Value
@@ -120,7 +123,8 @@ func (bc *BlockChain) FindNeedUTXOs(address string, need float64) (map[string][]
 }
 
 //返回包含一个地址交易的所有交易
-func (bc *BlockChain) FindALLTxs(address string) []*Transaction {
+func (bc *BlockChain) FindAllTxs(senderPubKeyHash []byte) []*Transaction {
+	//TODO  优化查询算法
 	var txs []*Transaction
 	it := bc.NewBlockChainIterator()
 	spentOutputs := make(map[string][]int64)
@@ -140,14 +144,15 @@ func (bc *BlockChain) FindALLTxs(address string) []*Transaction {
 						}
 					}
 				}
-				if output.PubKeyHash == address {
+				if bytes.Equal(output.PubKeyHash, senderPubKeyHash) {
 					txs = append(txs, tx)
 				}
 			}
 			//遍历input, 找到花费的utxo合集
 			if !tx.IsCoinbase() {
 				for _, input := range tx.TXInputs {
-					if input.Sig == address {
+					hashPubKey := HashPubKey(input.PubKey)
+					if bytes.Equal(hashPubKey, senderPubKeyHash) {
 						spentOutputs[string(input.TXid)] = append(spentOutputs[string(input.TXid)], input.Index)
 					}
 				}

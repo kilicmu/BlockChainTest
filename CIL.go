@@ -10,6 +10,8 @@ var useinfo string = `
 list				打印链
 search --address ADDRESS	查询address余额
 send FROM to TO PRICE SOMEONE Data	发送货币从地址1到地址2, 其中最后指定矿工打包交易
+wallet	生成一个钱包
+show address	显示全部地址
 `
 
 type CIL struct {
@@ -38,7 +40,14 @@ func (cil *CIL) Run() error {
 			amount, _ := strconv.ParseFloat(args[5], 64)
 			miner := args[6]
 			data := args[7]
+			fmt.Println(amount)
 			cil.Send(from, to, amount, miner, data)
+		}
+	case "wallet":
+		cil.NewWallet()
+	case "show":
+		if len(args) == 3 && args[2] == "address" {
+			cil.ListAddresses()
 		}
 	default:
 		fmt.Println("参数错误")

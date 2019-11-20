@@ -44,7 +44,6 @@ func (pow *ProofOfWork) Run() (uint64, []byte) {
 			return nonce, hash[:]
 		} else {
 			nonce++
-			//fmt.Print(nonce)
 		}
 	}
 

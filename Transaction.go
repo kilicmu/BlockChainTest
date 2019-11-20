@@ -5,10 +5,11 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
+	"github.com/btcsuite/btcutil/base58"
 	"log"
 )
 
-const amount = 12.5
+const reward = 12.5
 
 type Transaction struct {
 	TXID      []byte
@@ -17,14 +18,16 @@ type Transaction struct {
 }
 
 type TXInput struct {
-	TXid  []byte //引用utxo所在交易的id
-	Index int64  //所消费utxo在output中的索引
-	Sig   string
+	TXid      []byte //引用utxo所在交易的id
+	Index     int64  //所消费utxo在output中的索引
+	Signature []byte //数字签名, r, s组成的[]byte
+	PubKey    []byte
 }
 
 type TXOutput struct {
-	Value      float64
-	PubKeyHash string
+	Value float64
+	// PubKeyHash string
+	PubKeyHash []byte //是 公钥不是哈希或地址
 }
 
 //为交易设置TXID(交易hash)
@@ -41,14 +44,34 @@ func (tx *Transaction) SetHash() {
 	tx.TXID = hash[:]
 }
 
+func (output *TXOutput) Lock(address string) {
+	data := GetPubKeyHash(address)
+	output.PubKeyHash = data
+}
+
+func GetPubKeyHash(address string) []byte {
+	data := base58.Decode(address)
+	len := len(data)
+	data = data[1 : len-4]
+	return data
+}
+
+func NewTXOutput(value float64, address string) *TXOutput {
+	output := TXOutput{
+		Value: value,
+	}
+	output.Lock(address)
+	return &output
+}
+
 //挖矿交易的创建
 func NewCoinBase(address string, data string) *Transaction {
-	input := TXInput{TXid: []byte{}, Index: -1, Sig: data}
-	output := TXOutput{Value: amount, PubKeyHash: address}
+	input := TXInput{TXid: []byte{}, Index: -1, Signature: nil, PubKey: []byte(data)}
+	output := NewTXOutput(reward, address)
 	tx := Transaction{
 		[]byte{},
 		[]TXInput{input},
-		[]TXOutput{output},
+		[]TXOutput{*output},
 	}
 	tx.SetHash()
 	return &tx
@@ -56,23 +79,34 @@ func NewCoinBase(address string, data string) *Transaction {
 
 //普通交易的创建
 func NewTransaction(from, to string, amount float64, bc *BlockChain) *Transaction {
+	ws := NewWallets()
+	wallet := ws.WalletMap[from]
+	if wallet == nil {
+		fmt.Println("钱包不存在")
+		return nil
+	}
+	pubKey := wallet.PublicKey
+	//需要传递的是公钥的哈希
+	pubKeyHash := HashPubKey(pubKey)
 
 	var inputs []TXInput
 	var outputs []TXOutput
-	utxos, factAmount := bc.FindNeedUTXOs(from, amount)
+	utxos, factAmount := bc.FindNeedUTXOs(pubKeyHash, amount)
+	fmt.Println("factAmount: ", factAmount)
 	if factAmount < amount {
-		fmt.Println(factAmount)
+		fmt.Println("余额不足")
 		return nil
 	}
 	for key, outputs := range utxos {
 		for _, i := range outputs {
-			input := TXInput{TXid: []byte(key), Index: i, Sig: from}
+			input := TXInput{TXid: []byte(key), Index: i, Signature: nil, PubKey: pubKey}
 			inputs = append(inputs, input)
 		}
 	}
-	outputs = append(outputs, TXOutput{Value: amount, PubKeyHash: to})
+	outputs = append(outputs, *NewTXOutput(amount, to))
 	if factAmount > amount {
-		outputs = append(outputs, TXOutput{Value: factAmount - amount, PubKeyHash: from})
+
+		outputs = append(outputs, *NewTXOutput(factAmount-amount, from))
 	}
 	tx := Transaction{[]byte{}, inputs, outputs}
 	return &tx
