@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"log"
 
@@ -64,7 +66,12 @@ func NewBlockChain(address string) *BlockChain {
 }
 
 func (bc *BlockChain) AddBlock(txs []*Transaction) {
-
+	for _, tx := range txs {
+		if !bc.VerifyTransaction(tx) {
+			fmt.Println("矿工发现无效交易")
+			return
+		}
+	}
 	bc.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket([]byte(BucketName))
 		if bucket == nil {
@@ -166,4 +173,48 @@ func (bc *BlockChain) FindAllTxs(senderPubKeyHash []byte) []*Transaction {
 	}
 
 	return txs
+}
+
+func (bc *BlockChain) FindTxByID(id []byte) (Transaction, error) {
+	it := bc.NewBlockChainIterator()
+	for {
+		block := it.Next()
+		for _, tx := range block.Transactions {
+			if bytes.Equal(tx.TXID, id) {
+				return *tx, nil
+			}
+		}
+
+		if block.PrvHash == nil {
+			break
+		}
+	}
+	return Transaction{}, errors.New("无效交易ID")
+}
+
+func (bc *BlockChain) SignTransaction(privateKey ecdsa.PrivateKey, tx *Transaction) {
+	prevTXs := make(map[string]Transaction)
+	for _, input := range tx.TXInputs {
+		tx, err := bc.FindTxByID(input.TXid)
+		if err != nil {
+			log.Panic(err)
+		}
+		prevTXs[(string(input.TXid))] = tx
+	}
+	tx.Sign(&privateKey, prevTXs)
+}
+
+func (bc *BlockChain) VerifyTransaction(tx *Transaction) bool {
+	if tx.IsCoinbase() {
+		return true
+	}
+	prevTX := make(map[string]Transaction)
+	for _, input := range tx.TXInputs {
+		tx, err := bc.FindTxByID(input.TXid)
+		if err != nil {
+			log.Panic(err)
+		}
+		prevTX[string(input.TXid)] = tx
+	}
+	return tx.Verify(prevTX)
 }
